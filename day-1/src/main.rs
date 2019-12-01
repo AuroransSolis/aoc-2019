@@ -1,30 +1,14 @@
-use std::io::{stdin, Read};
+use std::io::{stdin, BufRead};
 
 fn main() {
-    let mut input = String::new();
-    stdin().read_to_string(&mut input).unwrap();
-    part_1(&input);
-    part_2(&input);
-}
-
-fn part_1(input: &str) {
-    println!(
-        "{}",
-        input
-            .lines()
-            // Use saturating sub to avoid wrapping.
-            .map(|line| (line.parse::<usize>().unwrap() / 3).saturating_sub(2))
-            .sum::<usize>()
-    );
-}
-
-fn part_2(input: &str) {
-    println!(
-        "{}",
-        input.lines()
-            .map(|line| get_additional_fuel((line.parse::<usize>().unwrap() / 3).saturating_sub(2)))
-            .sum::<usize>()
-    );
+    let mut p1 = 0;
+    let mut p2 = 0;
+    stdin().lock().lines().for_each(|line| {
+        let starting_fuel = (line.unwrap().parse::<usize>().unwrap() / 3).saturating_sub(2);
+        p1 += starting_fuel;
+        p2 += get_additional_fuel(starting_fuel);
+    });
+    println!("p1: {}\np2: {}", p1, p2);
 }
 
 fn get_additional_fuel(fuel: usize) -> usize {
