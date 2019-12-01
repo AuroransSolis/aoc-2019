@@ -1,3 +1,4 @@
 .idea/
 target/
 Cargo.lock
+day-1/large_10m.txt
