@@ -1,9 +1,15 @@
-use std::io::{stdin, BufRead};
+use std::fs::File;
+use std::io::{stdin, BufRead, BufReader};
 
 fn main() {
     let mut p1 = 0;
     let mut p2 = 0;
-    stdin().lock().lines().for_each(|line| {
+    /*stdin().lock().lines().for_each(|line| {
+        let starting_fuel = (line.unwrap().parse::<usize>().unwrap() / 3).saturating_sub(2);
+        p1 += starting_fuel;
+        p2 += get_additional_fuel(starting_fuel);
+    });*/
+    BufReader::new(File::open("day-1/large_100k.txt").unwrap()).lines().for_each(|line| {
         let starting_fuel = (line.unwrap().parse::<usize>().unwrap() / 3).saturating_sub(2);
         p1 += starting_fuel;
         p2 += get_additional_fuel(starting_fuel);
