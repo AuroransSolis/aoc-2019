@@ -5,7 +5,6 @@ fn main() {
     stdin().read_to_string(&mut input).unwrap();
     part_1(&input);
     part_2(&input);
-    println!("{}", get_additional_fuel(1969 / 3 - 2));
 }
 
 fn part_1(input: &str) {
