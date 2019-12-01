@@ -18,16 +18,6 @@ fn main() {
         p1 += starting_fuel;
         p2 += get_additional_fuel(starting_fuel);
     });
-    /*stdin().lock().lines().for_each(|line| {
-        let starting_fuel = (line.unwrap().parse::<u32>().unwrap() / 3).saturating_sub(2);
-        p1 += starting_fuel;
-        p2 += get_additional_fuel(starting_fuel);
-    });*/
-    /*BufReader::new(File::open("day-1/large_10m.txt").unwrap()).lines().for_each(|line| {
-        let starting_fuel = (line.unwrap().parse::<u32>().unwrap() / 3).saturating_sub(2);
-        p1 += starting_fuel;
-        p2 += get_additional_fuel(starting_fuel);
-    });*/
     println!("p1: {}\np2: {}", p1, p2);
     println!("{}", get_additional_fuel(654));
 }
