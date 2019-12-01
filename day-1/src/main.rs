@@ -1,8 +1,7 @@
 mod lookup;
 
 use lookup::LOOKUP;
-use std::fs::File;
-use std::io::{stdin, BufRead, BufReader};
+use std::io::{stdin, BufRead};
 
 fn main() {
     let mut p1 = 0;
