@@ -1,6 +1,8 @@
-mod lookup;
+mod p1_lookup;
+mod p2_lookup;
 
-use lookup::LOOKUP;
+use p1_lookup::P1_LOOKUP;
+use p2_lookup::P2_LOOKUP;
 use std::io::{stdin, BufRead};
 
 fn main() {
@@ -13,12 +15,10 @@ fn main() {
             starting_fuel += (c as u32 & 15) * mul;
             mul *= 10;
         }
-        let starting_fuel = LOOKUP[starting_fuel as usize];
-        p1 += starting_fuel;
-        p2 += get_additional_fuel(starting_fuel);
+        p1 += P1_LOOKUP[starting_fuel as usize];
+        p2 += P2_LOOKUP[starting_fuel as usize];
     });
     println!("p1: {}\np2: {}", p1, p2);
-    println!("{}", get_additional_fuel(654));
 }
 
 fn get_additional_fuel(fuel: u32) -> u32 {
@@ -28,6 +28,6 @@ fn get_additional_fuel(fuel: u32) -> u32 {
         fuel
     } else {
         // Otherwise, find out how much more we need.
-        fuel + get_additional_fuel(LOOKUP[fuel as usize])
+        fuel + get_additional_fuel(P1_LOOKUP[fuel as usize])
     }
 }
