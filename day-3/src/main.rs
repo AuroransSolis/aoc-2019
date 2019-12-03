@@ -63,8 +63,7 @@ impl Move {
             amt
         }
     }
-
-    // Option<(Manhattan optimal, signal latency optimal)>
+    
     fn intersect(&self, other: &Move) -> Option<(i32, i32)> {
         let mut m1 = *self;
         let mut m2 = *other;
