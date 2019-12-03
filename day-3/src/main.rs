@@ -1,124 +1,69 @@
-use std::io::{stdin, Read};
-use std::collections::{HashSet, HashMap};
+use std::io::{stdin, BufRead};
+use std::collections::HashMap;
 
 fn main() {
-    let mut input = String::new();
-    stdin().read_to_string(&mut input).unwrap();
-    part_1(&input);
-    part_2(&input);
-}
-
-fn part_1(input: &str) {
-    let lines = input.lines().collect::<Vec<_>>();
-    let mut line_points = vec![HashSet::new(); lines.len()];
-    for (i, line) in lines.into_iter().enumerate() {
+    let mut line_points = Vec::new();
+    for line in stdin().lock().lines() {
+        let line = line.unwrap();
+        let mut points = HashMap::new();
+        points.insert((0, 0), 0);
         let moves = line.split(',').collect::<Vec<_>>();
         let mut x = 0;
         let mut y = 0;
         for m in moves {
             let (d, amt) = m.split_at(1);
             let amt = amt.parse::<i64>().unwrap();
-            match d {
-                "U" => {
-                    for y in y + 1..=y + amt {
-                        line_points[i].insert((x, y));
+            let instr = match d {
+                "U" => yp1,
+                "R" => xp1,
+                "D" => ym1,
+                "L" => xm1,
+                _ => panic!("Invalid direction! Not [URDL]."),
+            };
+            for _ in 0..amt {
+                instr(&mut x, &mut y);
+                let steps_to = points.len();
+                points.insert((x, y), steps_to);
+            }
+        }
+        line_points.push(points);
+    }
+    let mut abs_closest = std::i64::MAX;
+    let mut signal_closest = std::usize::MAX;
+    for i in 0..line_points.len() - 1 {
+        for j in i + 1..line_points.len() {
+            for (&(x, y), &l1_steps_to) in line_points[i].iter() {
+                if x | y == 0 {
+                    continue;
+                } else {
+                    if x.abs() + y.abs() < abs_closest && line_points[j].contains_key(&(x, y)) {
+                        abs_closest = x.abs() + y.abs();
                     }
-                    y += amt;
-                },
-                "R" => {
-                    for x in x + 1..=x + amt {
-                        line_points[i].insert((x, y));
+                    if l1_steps_to < signal_closest {
+                        if let Some(&l2_steps_to) = line_points[j].get(&(x, y)) {
+                            signal_closest = signal_closest.min(l1_steps_to + l2_steps_to);
+                        }
                     }
-                    x += amt;
-                },
-                "D" => {
-                    for y in y - amt..y {
-                        line_points[i].insert((x, y));
-                    }
-                    y -= amt;
-                },
-                "L" => {
-                    for x in x - amt..x {
-                        line_points[i].insert((x, y));
-                    }
-                    x -= amt;
-                },
-                _ => panic!("Invalid direction"),
+                }
             }
         }
     }
-    let mut shortest = std::i64::MAX;
-    let mut shortest_x = shortest;
-    let mut shortest_y = shortest;
-    for &(x, y) in line_points[1].iter() {
-        if x == y && x == 0 {
-            continue;
-        }
-        if line_points[0].contains(&(x, y)) {
-            if x.abs() + y.abs() < shortest {
-                shortest = x.abs() + y.abs();
-                shortest_x = x;
-                shortest_y = y;
-            }
-        }
-    }
-    println!("shortest: {} ({}, {})", shortest, shortest_x, shortest_y);
+    println!("p1: {}", abs_closest);
+    println!("p2: {}", signal_closest);
 }
 
-fn part_2(input: &str) {
-    let lines = input.lines().collect::<Vec<_>>();
-    let mut line_points = vec![HashMap::new(); lines.len()];
-    for i in 0..lines.len() {
-        line_points[i].insert((0, 0), 0);
-    }
-    for (i, line) in lines.into_iter().enumerate() {
-        let moves = line.split(',').collect::<Vec<_>>();
-        let mut x = 0;
-        let mut y = 0;
-        for m in moves {
-            let (d, amt) = m.split_at(1);
-            let amt = amt.parse::<i64>().unwrap();
-            match d {
-                "U" => {
-                    for y in y + 1..=y + amt {
-                        let steps_to = line_points[i].len();
-                        line_points[i].insert((x, y), steps_to);
-                    }
-                    y += amt;
-                },
-                "R" => {
-                    for x in x + 1..=x + amt {
-                        let steps_to = line_points[i].len();
-                        line_points[i].insert((x, y), steps_to);
-                    }
-                    x += amt;
-                },
-                "D" => {
-                    for y in (y - amt..y).rev() {
-                        let steps_to = line_points[i].len();
-                        line_points[i].insert((x, y), steps_to);
-                    }
-                    y -= amt;
-                },
-                "L" => {
-                    for x in (x - amt..x).rev() {
-                        let steps_to = line_points[i].len();
-                        line_points[i].insert((x, y), steps_to);
-                    }
-                    x -= amt;
-                },
-                _ => panic!("Invalid direction"),
-            }
-        }
-    }
-    let mut shortest = std::usize::MAX;
-    for (point, &l2_steps) in line_points[1].iter() {
-        if *point == (0, 0) {
-            continue;
-        }
-        if let Some(&l1_steps) = line_points[0].get(point) {
-            shortest = shortest.min(l1_steps + l2_steps);
-        }
-    }
-    println!("shortest: {}", shortest);
+fn yp1(_x: &mut i64, y: &mut i64) {
+    *y += 1;
+}
+
+fn xp1(x: &mut i64, _y: &mut i64) {
+    *x += 1;
+}
+
+fn ym1(_x: &mut i64, y: &mut i64) {
+    *y -= 1;
+}
+
+fn xm1(x: &mut i64, _y: &mut i64) {
+    *x -= 1;
 }
