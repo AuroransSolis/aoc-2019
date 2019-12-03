@@ -63,7 +63,7 @@ impl Move {
             amt
         }
     }
-    
+
     fn intersect(&self, other: &Move) -> Option<(i32, i32)> {
         let mut m1 = *self;
         let mut m2 = *other;
@@ -155,6 +155,9 @@ fn main() {
     let mut l1_signal_cost = 0;
     let mut l2_signal_cost = 0;
     for m1 in l1.iter() {
+        if l1_signal_cost >=  signal_closest_cost && m1.x.abs() + m1.y.abs() >= abs_closest_cost {
+            continue;
+        }
         for m2 in l2.iter() {
             if let Some((x, y)) = m1.intersect(m2) {
                 if x | y == 0 {
