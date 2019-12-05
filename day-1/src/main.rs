@@ -18,8 +18,8 @@ fn main() {
     let mut mass = 0;
     for &b in chars.iter() {
         if b == b'\n' {
-            p1 += P1_LOOKUP[mass];
-            p2 += P2_LOOKUP[mass];
+            p1 += unsafe { P1_LOOKUP.get_unchecked(mass) };
+            p2 += unsafe { P2_LOOKUP.get_unchecked(mass) };
             mass = 0;
         } else {
             mass *= 10;
