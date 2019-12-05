@@ -107,8 +107,8 @@ impl Program {
                     match op {
                         ADD => p1 + p2,
                         MUL => p1 * p2,
-                        SLT => if p1 < p2 { 1 } else { 0 },
-                        SEQ => if p1 == p2 { 1 } else { 0 },
+                        SLT => (p1 < p2) as i64,
+                        SEQ => (p1 == p2) as i64,
                         _ => unreachable!(),
                     },
                 )?;
