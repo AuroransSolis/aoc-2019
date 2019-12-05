@@ -1,12 +1,10 @@
-use std::fs::read_to_string;
-use std::io::stdin;
-use std::process::exit;
+use std::fmt::{self, Display};
+use std::io::{stdin, Read};
 
-#[derive(Copy, Clone, Debug)]
-enum Mode {
-    Addr(i64),
-    Imm(i64),
-}
+const OP: i64 = 0;
+const P1: i64 = 1;
+const P2: i64 = 2;
+const P3: i64 = 3;
 
 const ADD: i64 = 1;
 const MUL: i64 = 2;
@@ -17,20 +15,35 @@ const JIF: i64 = 6;
 const SLT: i64 = 7;
 const SEQ: i64 = 8;
 const BRK: i64 = 99;
+const LAD: i64 = 0;
+const LIM: i64 = 1;
 
-impl Mode {
-    fn new(p: i64, v: i64) -> Self {
-        match p {
-            0 => Mode::Addr(v),
-            1 => Mode::Imm(v),
-            _ => panic!("Invalid mode encountered!"),
-        }
-    }
+#[derive(Debug)]
+enum Step<'a> {
+    Continue,
+    Input(&'a mut i64),
+    Break,
+}
 
-    fn unwrap(&self) -> i64 {
+#[derive(Copy, Clone, Debug)]
+enum StepError {
+    InvalidOp(i64),
+    InvalidMode(i64),
+    OobLoad(i64),
+    OobWrite(i64),
+    NotEnoughInputs,
+}
+
+impl Display for StepError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Mode::Addr(addr) => *addr,
-            Mode::Imm(imm) => *imm,
+            StepError::InvalidOp(op) => write!(f, "Encountered invalid opcode: {}", op),
+            StepError::InvalidMode(mode) => {
+                write!(f, "Encountered invalid addressing mode: {}", mode)
+            }
+            StepError::OobLoad(addr) => write!(f, "Tried to read out of bounds (addr: {})", addr),
+            StepError::OobWrite(addr) => write!(f, "Tried to write out of bounds (addr: {})", addr),
+            StepError::NotEnoughInputs => write!(f, "Not enough inputs!"),
         }
     }
 }
@@ -43,105 +56,128 @@ struct Program {
 
 impl Program {
     fn new(mem: Vec<i64>) -> Self {
-        Program {
-            mem,
-            pc: 0
+        Program { mem, pc: 0 }
+    }
+
+    fn load(&self, mode: i64, part: i64) -> Result<i64, StepError> {
+        match mode {
+            LAD => match self.mem.get(self.pc + part as usize) {
+                Some(idx) => match self.mem.get(*idx as usize) {
+                    Some(val) => Ok(*val),
+                    None => Err(StepError::OobLoad(*idx)),
+                },
+                None => Err(StepError::OobLoad(self.pc as i64 + part)),
+            },
+            LIM => match self.mem.get(self.pc + part as usize) {
+                Some(val) => Ok(*val),
+                None => Err(StepError::OobLoad(self.pc as i64 + part)),
+            },
+            _ => Err(StepError::InvalidMode(mode)),
         }
     }
 
-    fn step(&mut self) -> bool {
-        let [op, p1, p2] = parse_instr(self.mem[self.pc]);
-        match op {
+    fn store(&mut self, idx: i64, val: i64) -> Result<(), StepError> {
+        match self.mem.get_mut(idx as usize) {
+            Some(v) => Ok(*v = val),
+            None => Err(StepError::OobWrite(idx)),
+        }
+    }
+
+    fn address(&mut self, idx: i64) -> Result<&mut i64, StepError> {
+        match self.mem.get_mut(idx as usize) {
+            Some(v) => Ok(v),
+            None => Err(StepError::OobWrite(idx)),
+        }
+    }
+
+    fn step(&mut self) -> Result<Step, StepError> {
+        let mut complete = self.load(LIM, OP)?;
+        let op = complete % 100;
+        complete /= 100;
+        let m1 = complete % 10;
+        match op % 100 {
             op @ ADD | op @ MUL | op @ SLT | op @ SEQ => {
-                let v1 = Mode::new(p1, self.mem[self.pc + 1]);
-                let v2 = Mode::new(p2, self.mem[self.pc + 2]);
-                let v1 = match v1 {
-                    Mode::Addr(addr) => self.mem[addr as usize],
-                    Mode::Imm(imm) => imm,
-                };
-                let v2 = match v2 {
-                    Mode::Addr(addr) => self.mem[addr as usize],
-                    Mode::Imm(imm) => imm,
-                };
-                let write = self.mem[self.pc + 3] as usize;
-                self.mem[write] = match op {
-                    ADD => v1 + v2,
-                    MUL => v1 * v2,
-                    SLT => if v1 < v2 { 1 } else { 0 },
-                    SEQ => if v1 == v2 { 1 } else { 0 },
-                    _ => unreachable!(),
-                };
+                complete /= 10;
+                let m2 = complete % 10;
+                let p1 = self.load(m1, P1)?;
+                let p2 = self.load(m2, P2)?;
+                let w = self.load(LIM, P3)?;
+                self.store(
+                    w,
+                    match op {
+                        ADD => p1 + p2,
+                        MUL => p1 * p2,
+                        SLT => if p1 < p2 { 1 } else { 0 },
+                        SEQ => if p1 == p2 { 1 } else { 0 },
+                        _ => unreachable!(),
+                    },
+                )?;
                 self.pc += 4;
-            },
-            op @ 5 | op @ 6 => {
-                let v1 = Mode::new(p1, self.mem[self.pc + 1]);
-                let v2 = Mode::new(p2, self.mem[self.pc + 2]);
-                let v1 = match v1 {
-                    Mode::Addr(addr) => self.mem[addr as usize],
-                    Mode::Imm(imm) => imm,
-                };
-                let v2 = match v2 {
-                    Mode::Addr(addr) => self.mem[addr as usize],
-                    Mode::Imm(imm) => imm,
-                };
+                Ok(Step::Continue)
+            }
+            op @ JIT | op @ JIF => {
+                complete /= 10;
+                let m2 = complete % 10;
+                let p1 = self.load(m1, P1)?;
+                let p2 = self.load(m2, P2)?;
                 if match op {
-                    JIT => v1 != 0,
-                    JIF => v1 == 0,
+                    JIT => p1 != 0,
+                    JIF => p1 == 0,
                     _ => unreachable!(),
                 } {
-                    self.pc = v2 as usize;
+                    self.pc = p2 as usize;
                 } else {
                     self.pc += 3;
                 }
+                Ok(Step::Continue)
             }
             GET => {
-                let v1 = Mode::new(p1, self.mem[self.pc + 1]);
-                let mut input = String::new();
-                stdin().read_line(&mut input).unwrap();
-                let input = input.trim();
-                let input = input.parse::<i64>().unwrap();
-                self.mem[v1.unwrap() as usize] = input;
+                let p1 = self.load(LIM, P1)?;
                 self.pc += 2;
-            },
-            PRT => {
-                let v1 = Mode::new(p1, self.mem[self.pc + 1]);
-                let v1 = match v1 {
-                    Mode::Addr(addr) => self.mem[addr as usize],
-                    Mode::Imm(imm) => imm,
-                };
-                println!("{}", v1);
-                self.pc += 2;
-            },
-            BRK => return false,
-            _ => {
-                eprintln!("Encountered invalid opcode: {}", op);
-                exit(0);
+                let w = self.address(p1)?;
+                Ok(Step::Input(w))
             }
-        };
-        true
+            PRT => {
+                let p1 = self.load(m1, P1)?;
+                println!("{}", p1);
+                self.pc += 2;
+                Ok(Step::Continue)
+            }
+            BRK => Ok(Step::Break),
+            _ => Err(StepError::InvalidOp(op)),
+        }
+    }
+
+    fn run(&mut self, input: &[i64]) {
+        let mut input_iter = input.iter();
+        loop {
+            match self.step().unwrap() {
+                Step::Continue => continue,
+                Step::Input(w) => {
+                    *w = *input_iter
+                        .next()
+                        .ok_or_else(|| &StepError::NotEnoughInputs)
+                        .unwrap();
+                }
+                Step::Break => break,
+            }
+        }
     }
 }
 
 fn main() {
-    let memory = read_to_string("day-5/input.txt").unwrap();
+    let mut memory = String::new();
+    stdin().lock().read_to_string(&mut memory).unwrap();
     let memory = memory.trim();
-    // let mut memory = String::new();
-    // stdin().read_line(&mut memory).unwrap();
-    // let memory = memory.trim();
     let memory = memory
         .trim()
         .split(',')
-        .map(|x| x.parse::<i64>().expect("a"))
+        .map(|x| x.parse::<i64>().unwrap())
         .collect::<Vec<i64>>();
-    let mut program = Program::new(memory);
-    while program.step() {}
-}
-
-fn parse_instr(mut instr: i64) -> [i64; 3] {
-    let op = instr % 100;
-    instr /= 100;
-    let p1 = instr % 10;
-    instr /= 10;
-    let p2 = instr % 10;
-    [op, p1, p2]
+    let mut p1 = Program::new(memory);
+    let mut p2 = p1.clone();
+    println!("p1:");
+    p1.run(&[1]);
+    println!("\np2:");
+    p2.run(&[5]);
 }
