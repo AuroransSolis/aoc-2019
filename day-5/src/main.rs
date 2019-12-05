@@ -95,7 +95,7 @@ impl Program {
         let op = complete % 100;
         complete /= 100;
         let m1 = complete % 10;
-        match op % 100 {
+        match op {
             op @ ADD | op @ MUL | op @ SLT | op @ SEQ => {
                 complete /= 10;
                 let m2 = complete % 10;
