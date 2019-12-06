@@ -21,14 +21,6 @@ fn main() {
         }
     }
     println!("p1: {}", total);
-    let mut map = HashMap::new();
-    for line in input.lines() {
-        let mut split = line.split(')');
-        let orbited = split.next().unwrap();
-        let orbiter = split.next().unwrap();
-        map.entry(orbited).or_insert(vec![]).push(orbiter);
-        map.entry(orbiter).or_insert(vec![]);
-    }
     let mut num_transfers = 0;
     let mut you_base = get_parent(&map, "YOU");
     while !children_contains(&map, you_base, "SAN") && you_base != "COM" {
