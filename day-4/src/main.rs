@@ -14,6 +14,18 @@ const RANGES: [Range<usize>; 9] = [
     888888..890000, // [888888, 889999]
 ];
 
+const P1_EXTRAS: [[usize; 2]; 9] = [
+    [089999, 099999],
+    [189999, 199999],
+    [289999, 299999],
+    [389999, 399999],
+    [489999, 499999],
+    [589999, 599999],
+    [689999, 699999],
+    [789999, 799999],
+    [889999, 899999],
+];
+
 const STARTS: [[u8; 6]; 9] = [
     [0; 6], // 000000
     [1; 6], // 111111
@@ -93,6 +105,11 @@ impl Password {
                 }
                 self.incr();
             }
+            if self.e_val > P1_EXTRAS[self.e_range][1] {
+                p1 += 2;
+            } else if self.e_val > P1_EXTRAS[self.e_range][0] {
+                p1 += 1;
+            }
         } else {
             // Find the appropriate start value for the range. If the start range contains the start
             // value, then the range should start at the start value. Otherwise, the start of the
@@ -114,6 +131,7 @@ impl Password {
                 }
                 self.incr();
             }
+            p1 += 2;
             // For each of the valid ranges between the input numbers, total up the valid keys for
             // p1 and p2
             for i in self.s_range + 1..self.e_range {
@@ -127,6 +145,7 @@ impl Password {
                     }
                     self.incr();
                 }
+                p1 += 2;
             }
             let new_key = STARTS[self.e_range];
             self.key = new_key;
@@ -146,6 +165,11 @@ impl Password {
                     p2 += 1;
                 }
                 self.incr();
+            }
+            if self.e_val > P1_EXTRAS[self.e_range][1] {
+                p1 += 2;
+            } else if self.e_val > P1_EXTRAS[self.e_range][0] {
+                p1 += 1;
             }
         }
         (p1, p2)
