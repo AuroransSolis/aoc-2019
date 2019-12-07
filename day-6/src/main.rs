@@ -1,62 +1,90 @@
 use std::io::{stdin, Read};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 fn main() {
     let mut input = String::new();
     stdin().lock().read_to_string(&mut input).unwrap();
     let mut map = HashMap::new();
+    let mut parents = HashSet::new();
+    let mut children = HashSet::new();
+    let mut depths = HashMap::new();
     for line in input.lines() {
         let mut split = line.split(')');
         let orbited = split.next().unwrap();
         let orbiter = split.next().unwrap();
-        map.entry(orbited).or_insert(vec![]).push(orbiter);
-        map.entry(orbiter).or_insert(vec![]);
+        map.insert(orbiter, orbited);
+        parents.insert(orbited);
+        children.insert(orbiter);
+        depths.entry(orbited).or_insert(0usize);
+        let parent_depth = *depths.get(orbited).unwrap();
+        depths.insert(orbiter, parent_depth + 1);
+        println!("parent: {} ({}) | child: {} ({})", orbited, parent_depth, orbiter, parent_depth + 1);
     }
+    let mut seen = HashSet::new();
     let mut total = map.len() - 1;
-    for children in map.values() {
-        if children.len() > 0 {
-            for &child in children.iter() {
-                total += get_num_indirects(&map, child);
+    println!("Depths:");
+    for mass in depths.iter() {
+        println!("{:?}", mass);
+    }
+    /*for child in map.values() {
+        if seen.insert(child) {
+            let mut at = child;
+            let mut path_length = 0;
+            while let Some(new) = map.get(at) {
+                total += 1;
+                at = new;
             }
         }
+    }*/
+    for base in children.difference(&parents) {
+        let mut at = base;
+        while let Some(new) = map.get(at) {
+            at = new;
+            if !seen.insert(new) {
+                break;
+            }
+        }
+        let parent_cost = *depths.get(map.get(base).unwrap()).unwrap();
+        let mut base_cost = *depths.get(base).unwrap();
+        if parent_cost > base_cost {
+            base_cost = parent_cost + 1;
+        }
+        println!("adding depths for {} to {}", base, at);
+        let start_depth = match base_cost {
+            0 => 0,
+            1 => 1,
+            depth => depth * (depth - 1)
+        };
+        println!("indirects for {}: {}", base, start_depth / 2);
+        let end_depth = match *depths.get(at).unwrap() {
+            0 => 0,
+            1 => 1,
+            depth => depth * (depth - 1)
+        };
+        println!("indirects for {}: {}", at, end_depth / 2);
+        println!("total new indirects: {}", start_depth.saturating_sub(end_depth) / 2);
+        total += (start_depth.saturating_sub(end_depth)) / 2;
     }
     println!("p1: {}", total);
     let mut num_transfers = 0;
-    let mut you_base = get_parent(&map, "YOU");
-    while !children_contains(&map, you_base, "SAN") && you_base != "COM" {
-        let new_base = get_parent(&map, you_base);
-        you_base = new_base;
+    let mut you_path = HashMap::new();
+    let mut at = map.get("YOU").unwrap();
+    you_path.insert(at, num_transfers);
+    while let Some(parent) = map.get(at) {
         num_transfers += 1;
+        you_path.insert(parent, num_transfers);
+        at = parent;
     }
-    let mut san_base = get_parent(&map, "SAN");
-    while san_base != you_base {
-        let new_base = get_parent(&map, san_base);
-        san_base = new_base;
-        num_transfers += 1;
+    at = map.get("SAN").unwrap();
+    let mut san_transfers = 0;
+    while let Some(parent) = map.get(at) {
+        if let Some(&transfers) = you_path.get(at) {
+            san_transfers += transfers;
+            break;
+        } else {
+            at = parent;
+            san_transfers += 1;
+        }
     }
-    println!("p2: {}", num_transfers);
-}
-
-fn get_num_indirects(map: &HashMap<&str, Vec<&str>>, name: &str) -> usize {
-    if let Some(children) = map.get(name) {
-        children.len() + children.iter().map(|&child| get_num_indirects(map, child)).sum::<usize>()
-    } else {
-        0
-    }
-}
-
-fn get_parent<'b, 'a: 'b>(map: &'b HashMap<&'a str, Vec<&'a str>>, name: &'a str) -> &'a str {
-    map.iter()
-        .find(|&(_, children)| children.contains(&name))
-        .map(|(&name, _)| name)
-        .expect("a")
-}
-
-fn children_contains(map: &HashMap<&str, Vec<&str>>, parent: &str, child: &str) -> bool {
-    let children = map.get(parent).unwrap();
-    if children.contains(&child) {
-        true
-    } else {
-        children.iter().any(|&direct_child| children_contains(map, direct_child, child))
-    }
+    println!("p2: {}", san_transfers);
 }
