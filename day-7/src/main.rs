@@ -1,7 +1,6 @@
 extern crate intcode_interpreter;
 
 use intcode_interpreter::Program;
-use std::fmt::{self, Display};
 use std::io::{stdin, Read};
 
 fn main() {
@@ -14,60 +13,56 @@ fn main() {
         .map(|x| x.parse::<i64>().unwrap())
         .collect::<Vec<i64>>();
     let p = Program::new(memory);
+    part_1(&p);
+    part_2(&p);
+}
+
+fn part_1(p: &Program) {
     let mut p1 = std::i64::MIN;
-    for a in 0..5 {
-        for b in (0..5).filter(|&b| b != a) {
-            for c in (0..5).filter(|&c| ![a, b].contains(&c)) {
-                for d in (0..5).filter(|&d| ![a, b, c].contains(&d)) {
-                    for e in (0..5).filter(|&e| ![a, b, c, d].contains(&e)) {
-                        let mut a1 = p.clone();
-                        let mut a2 = a1.clone();
-                        let mut a3 = a2.clone();
-                        let mut a4 = a3.clone();
-                        let mut a5 = a4.clone();
-                        let output = a1.run(&[a, 0]);
-                        let output = a2.run(&[b, output[0]]);
-                        let output = a3.run(&[c, output[0]]);
-                        let output = a4.run(&[d, output[0]]);
-                        let output = a5.run(&[e, output[0]]);
-                        p1 = p1.max(output[0]);
-                    }
-                }
-            }
-        }
+    let mut settings = [0, 1, 2, 3, 4];
+    while next_lex_perm(&mut settings) {
+        p1 = p1.max((0..5).fold(0, |acc, n| p.clone().run(&[settings[n], acc])[0]));
     }
     println!("p1: {}", p1);
+}
+
+fn part_2(p: &Program) {
     let mut p2 = std::i64::MIN;
-    for a in 5..10 {
-        for b in (5..10).filter(|&b| b != a) {
-            for c in (5..10).filter(|&c| ![a, b].contains(&c)) {
-                for d in (5..10).filter(|&d| ![a, b, c].contains(&d)) {
-                    for e in (5..10).filter(|&e| ![a, b, c, d].contains(&e)) {
-                        let mut a1 = p.clone();
-                        let mut a2 = a1.clone();
-                        let mut a3 = a2.clone();
-                        let mut a4 = a3.clone();
-                        let mut a5 = a4.clone();
-                        let output = a1.step_to_output(&[a, 0]).unwrap();
-                        let output = a2.step_to_output(&[b, output]).unwrap();
-                        let output = a3.step_to_output(&[c, output]).unwrap();
-                        let output = a4.step_to_output(&[d, output]).unwrap();
-                        let output = a5.step_to_output(&[e, output]).unwrap();
-                        let mut amps = [a1, a2, a3, a4, a5];
-                        let mut input = [output];
-                        'run: loop {
-                            for amp in amps.iter_mut() {
-                                match amp.step_to_output(&input) {
-                                    Some(output) => input = [output],
-                                    None => break 'run,
-                                }
-                            }
-                        }
-                        p2 = p2.max(input[0]);
-                    }
+    let mut settings = [5, 6, 7, 8, 9];
+    while next_lex_perm(&mut settings) {
+        let mut amps = [p.clone(), p.clone(), p.clone(), p.clone(), p.clone()];
+        let mut input = amps.iter_mut()
+            .enumerate()
+            .fold(0, |acc, (i, p)| p.step_to_output(&[settings[i], acc]).unwrap());
+        'run: loop {
+            for amp in amps.iter_mut() {
+                match amp.step_to_output(&[input]) {
+                    Some(output) => input = output,
+                    None => break 'run,
                 }
             }
         }
+        p2 = p2.max(input);
     }
     println!("p2: {}", p2);
+}
+
+fn next_lex_perm(set: &mut [i64]) -> bool {
+    if set.len() == 0 {
+        return false;
+    }
+    let mut i = set.len() - 1;
+    while i > 0 && set[i - 1] >= set[i] {
+        i -= 1;
+    }
+    if i == 0 {
+        return false;
+    }
+    let mut j = set.len() - 1;
+    while set[j] <= set[i - 1] {
+        j -= 1;
+    }
+    set.swap(i - 1, j);
+    set[i .. ].reverse();
+    true
 }
