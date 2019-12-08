@@ -30,7 +30,7 @@ assembler recognizes. The base-level bulletpoints are in the format
         - address to store the result at
 - GET - get user input
     - Takes one parameter:
-        - address to store input in
+        - address to store input in (note: does not require `@` prefix)
 - PRT - print integer
     - Takes one parameter:
         - literal/address for value to print
