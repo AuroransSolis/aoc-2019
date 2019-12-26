@@ -3,6 +3,7 @@ use std::fmt::{self, Display};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::process::exit;
 
 const ADD: &'static str = "ADD";
 const MUL: &'static str = "MUL";
@@ -45,57 +46,16 @@ impl Display for InstructionParseError {
 }
 
 enum Instruction {
-    Add {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-        p3: i64,
-    },
-    Mul {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-        p3: i64,
-    },
-    GetI {
-        p1: i64,
-    },
-    PrintI {
-        m1: i64,
-        p1: i64,
-    },
-    JumpNZ {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-    },
-    JumpZ {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-    },
-    SetLT {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-        p3: i64,
-    },
-    SetEq {
-        m1: i64,
-        m2: i64,
-        p1: i64,
-        p2: i64,
-        p3: i64,
-    },
+    Add { m1: i64, m2: i64, p1: i64, p2: i64, p3: i64 },
+    Mul { m1: i64, m2: i64, p1: i64, p2: i64, p3: i64 },
+    GetI { p1: i64 },
+    PrintI { m1: i64, p1: i64 },
+    JumpNZ { m1: i64, m2: i64, p1: i64, p2: i64 },
+    JumpZ { m1: i64, m2: i64, p1: i64, p2: i64 },
+    SetLT { m1: i64, m2: i64, p1: i64, p2: i64, p3: i64 },
+    SetEq { m1: i64, m2: i64, p1: i64, p2: i64, p3: i64 },
     Break,
-    Other {
-        v: i64,
-    },
+    Other { v: i64 },
 }
 
 impl Instruction {
@@ -104,16 +64,20 @@ impl Instruction {
         op_words.copy_from_slice(words);
         let [op, p1, p2, p3] = op_words;
         let (m1, p1) = if p1.starts_with('@') {
+            // Split the @ from the rest of the number in case it's an address
             (0, p1.split_at(1).1)
         } else {
+            // Otherwise leave it be
             (1, p1)
         };
         let p1 = p1
             .parse::<i64>()
             .map_err(|_| InstructionParseError::BadFirstParameter((line + 1, p1.to_string())))?;
         let (m2, p2) = if p2.starts_with('@') {
+            // Split the @ from the rest of the number in case it's an address
             (0, p2.split_at(1).1)
         } else {
+            // Otherwise leave it be
             (1, p2)
         };
         let p2 = p2
@@ -139,16 +103,20 @@ impl Instruction {
         op_words.copy_from_slice(words);
         let [op, p1, p2] = op_words;
         let (m1, p1) = if p1.starts_with('@') {
+            // Split the @ from the rest of the number in case it's an address
             (0, p1.split_at(1).1)
         } else {
+            // Otherwise leave it be
             (1, p1)
         };
         let p1 = p1
             .parse::<i64>()
             .map_err(|_| InstructionParseError::BadFirstParameter((line + 1, p1.to_string())))?;
         let (m2, p2) = if p2.starts_with('@') {
+            // Split the @ from the rest of the number in case it's an address
             (0, p2.split_at(1).1)
         } else {
+            // Otherwise leave it be
             (1, p2)
         };
         let p2 = p2
@@ -169,8 +137,10 @@ impl Instruction {
         op_words.copy_from_slice(words);
         let [op, p1] = op_words;
         let (m1, p1) = if p1.starts_with('@') {
+            // Split the @ from the rest of the number in case it's an address
             (0, p1.split_at(1).1)
         } else {
+            // Otherwise leave it be
             (1, p1)
         };
         let p1 = p1.parse::<i64>().map_err(|_| {
@@ -235,47 +205,17 @@ fn main() {
         println!("Too many arguments!");
     } else {
         let input = if words[0].starts_with("if=") {
-            let (_, path) = words[0].split_at(3);
-            if let Ok(contents) = fs::read_to_string(path) {
-                contents
-            } else if Path::new(path).exists() {
-                println!("Failed to read contents of input file. May be lacking permissions.");
-                return;
-            } else {
-                println!("File does not exist!");
-                return;
-            }
+            read_input_file(words[0])
         } else if words[1].starts_with("if=") {
-            let (_, path) = words[1].split_at(3);
-            if let Ok(contents) = fs::read_to_string(path) {
-                contents
-            } else if Path::new(path).exists() {
-                println!("Failed to read contents of input file. May be lacking permissions.");
-                return;
-            } else {
-                println!("File does not exist!");
-                return;
-            }
+            read_input_file(words[1])
         } else {
             println!("Missing input file parameter!");
             return;
         };
         let mut output = if words[0].starts_with("of=") {
-            let (_, path) = words[0].split_at(3);
-            if let Ok(file) = File::create(path) {
-                BufWriter::new(file)
-            } else {
-                println!("Failed to create output file. May be lacking permissions.");
-                return;
-            }
+            create_output_file(words[0])
         } else if words[1].starts_with("of=") {
-            let (_, path) = words[1].split_at(3);
-            if let Ok(file) = File::create(path) {
-                BufWriter::new(file)
-            } else {
-                println!("Failed to create output file. May be lacking permissions.");
-                return;
-            }
+            create_output_file(words[1])
         } else {
             println!("Missing output file parameter!");
             return;
@@ -338,5 +278,28 @@ fn main() {
         } else {
             println!("Successfully wrote intcode to file.");
         }
+    }
+}
+
+fn read_input_file(s: &str) -> String {
+    let (_, path) = s.split_at(3);
+    if let Ok(contents) = fs::read_to_string(path) {
+        contents
+    } else if Path::new(path).exists() {
+        println!("Failed to read contents of input file. May be lacking permissions.");
+        exit(0);
+    } else {
+        println!("File does not exist!");
+        exit(0);
+    }
+}
+
+fn create_output_file(s: &str) -> BufWriter<File> {
+    let (_, path) = s.split_at(3);
+    if let Ok(file) = File::create(path) {
+        BufWriter::new(file)
+    } else {
+        println!("Failed to create output file. May be lacking permissions.");
+        exit(0);
     }
 }
