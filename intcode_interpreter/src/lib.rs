@@ -13,9 +13,11 @@ const JIT: i64 = 5;
 const JIF: i64 = 6;
 const SLT: i64 = 7;
 const SEQ: i64 = 8;
+const REL: i64 = 9;
 const BRK: i64 = 99;
 const LAD: i64 = 0;
 const LIM: i64 = 1;
+const LRL: i64 = 2;
 
 #[derive(Debug)]
 pub enum Step<'a> {
@@ -52,11 +54,12 @@ impl Display for StepError {
 pub struct Program {
     mem: Vec<i64>,
     pc: usize,
+    rel: usize,
 }
 
 impl Program {
     pub fn new(mem: Vec<i64>) -> Self {
-        Program { mem, pc: 0 }
+        Program { mem, pc: 0, rel: 0 }
     }
 
     fn load(&self, mode: i64, part: i64) -> Result<i64, StepError> {
@@ -70,6 +73,13 @@ impl Program {
             },
             LIM => match self.mem.get(self.pc + part as usize) {
                 Some(val) => Ok(*val),
+                None => Err(StepError::OobLoad(self.pc as i64 + part)),
+            },
+            LRL => match self.mem.get(self.pc + part as usize) {
+                Some(offset) => match self.mem.get(self.rel + *offset as usize) {
+                    Some(val) => Ok(*val),
+                    None => Err(StepError::OobLoad(self.rel as i64 + *offset))
+                },
                 None => Err(StepError::OobLoad(self.pc as i64 + part)),
             },
             _ => Err(StepError::InvalidMode(mode)),
@@ -131,17 +141,24 @@ impl Program {
                 }
                 Ok(Step::Continue)
             }
+            op @ PRT | op @ REL => {
+                let p1 = self.load(m1, P1)?;
+                self.pc += 2;
+                match op {
+                    PRT => Ok(Step::Output(p1)),
+                    REL => {
+                        self.rel = (self.rel as i64 + p1) as usize;
+                        Ok(Step::Continue)
+                    },
+                    _ => unreachable!(),
+                }
+            }
             GET => {
                 let p1 = self.load(LIM, P1)?;
                 self.pc += 2;
                 let w = self.address(p1)?;
                 Ok(Step::Input(w))
-            }
-            PRT => {
-                let p1 = self.load(m1, P1)?;
-                self.pc += 2;
-                Ok(Step::Output(p1))
-            }
+            },
             BRK => Ok(Step::Break),
             _ => Err(StepError::InvalidOp(op)),
         }
