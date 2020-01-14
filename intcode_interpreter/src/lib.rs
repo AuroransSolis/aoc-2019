@@ -18,6 +18,7 @@ const BRK: i64 = 99;
 const LAD: i64 = 0;
 const LIM: i64 = 1;
 const LRL: i64 = 2;
+const WRL: i64 = 2;
 
 #[derive(Debug)]
 pub enum Step<'a> {
@@ -62,7 +63,7 @@ impl Program {
         Program { mem, pc: 0, rel: 0 }
     }
 
-    fn load(&self, mode: i64, part: i64) -> Result<i64, StepError> {
+    fn load(&mut self, mode: i64, part: i64) -> Result<i64, StepError> {
         match mode {
             LAD => match self.mem.get(self.pc + part as usize) {
                 Some(idx) => match self.mem.get(*idx as usize) {
@@ -76,9 +77,14 @@ impl Program {
                 None => Err(StepError::OobLoad(self.pc as i64 + part)),
             },
             LRL => match self.mem.get(self.pc + part as usize) {
-                Some(offset) => match self.mem.get(self.rel + *offset as usize) {
+                Some(offset) => match self.mem.get((self.rel as i64 + *offset) as usize) {
                     Some(val) => Ok(*val),
-                    None => Err(StepError::OobLoad(self.rel as i64 + *offset))
+                    None => {
+                        for _ in self.mem.len()..=(self.rel as i64 + *offset) as usize {
+                            self.mem.push(0);
+                        }
+                        Ok(0)
+                    }
                 },
                 None => Err(StepError::OobLoad(self.pc as i64 + part)),
             },
@@ -86,17 +92,41 @@ impl Program {
         }
     }
 
-    fn store(&mut self, idx: i64, val: i64) -> Result<(), StepError> {
-        match self.mem.get_mut(idx as usize) {
+    fn store(&mut self, rel: bool, idx_val: i64, val: i64) -> Result<(), StepError> {
+        let idx = if rel {
+            self.rel as i64 + idx_val
+        } else {
+            idx_val
+        } as usize;
+        match self.mem.get_mut(idx) {
             Some(v) => Ok(*v = val),
-            None => Err(StepError::OobWrite(idx)),
+            None => if rel {
+                for _ in self.mem.len()..=idx {
+                    self.mem.push(0);
+                }
+                Ok(())
+            } else {
+                Err(StepError::OobWrite(idx as i64))
+            },
         }
     }
 
-    fn address(&mut self, idx: i64) -> Result<&mut i64, StepError> {
+    fn address(&mut self, rel: bool, idx_val: i64) -> Result<&mut i64, StepError> {
+        let idx = if rel {
+            self.rel as i64 + idx_val
+        } else {
+            idx_val
+        } as usize;
         match self.mem.get_mut(idx as usize) {
             Some(v) => Ok(v),
-            None => Err(StepError::OobWrite(idx)),
+            None => if rel {
+                for _ in self.mem.len()..=idx as usize {
+                    self.mem.push(0);
+                }
+                Ok(&mut self.mem[idx])
+            } else {
+                Err(StepError::OobWrite(idx as i64))
+            },
         }
     }
 
@@ -106,13 +136,16 @@ impl Program {
         complete /= 100;
         let m1 = complete % 10;
         match op {
-            op @ ADD | op @ MUL | op @ SLT | op @ SEQ => {
+            op @ ADD | op @ MUL | op @ SLT | op @ SEQ => { // Three args
                 complete /= 10;
                 let m2 = complete % 10;
+                complete /= 10;
+                let m3 = complete % 10;
                 let p1 = self.load(m1, P1)?;
                 let p2 = self.load(m2, P2)?;
-                let w = self.load(LIM, P3)?;
+                let w = self.load(m3, P3)?;
                 self.store(
+                    m3 == WRL,
                     w,
                     match op {
                         ADD => p1 + p2,
@@ -125,7 +158,7 @@ impl Program {
                 self.pc += 4;
                 Ok(Step::Continue)
             }
-            op @ JIT | op @ JIF => {
+            op @ JIT | op @ JIF => { // Two args
                 complete /= 10;
                 let m2 = complete % 10;
                 let p1 = self.load(m1, P1)?;
@@ -141,10 +174,11 @@ impl Program {
                 }
                 Ok(Step::Continue)
             }
-            op @ PRT | op @ REL => {
+            op @ PRT | op @ REL | op @ GET => { // One arg
                 let p1 = self.load(m1, P1)?;
                 self.pc += 2;
                 match op {
+                    GET => Ok(Step::Input(self.address(m1 == WRL, p1)?)),
                     PRT => Ok(Step::Output(p1)),
                     REL => {
                         self.rel = (self.rel as i64 + p1) as usize;
@@ -153,12 +187,7 @@ impl Program {
                     _ => unreachable!(),
                 }
             }
-            GET => {
-                let p1 = self.load(LIM, P1)?;
-                self.pc += 2;
-                let w = self.address(p1)?;
-                Ok(Step::Input(w))
-            },
+            // Opcodes with no arguments will get their own branches
             BRK => Ok(Step::Break),
             _ => Err(StepError::InvalidOp(op)),
         }
